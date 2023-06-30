@@ -42,7 +42,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response<PalomaMsg>, ContractError> {
     match msg {
-        ExecuteMsg::PutVote { votes } => execute::vote(deps, votes),
+        ExecuteMsg::PutVote { bots, votes } => execute::vote(deps, bots, votes),
     }
 }
 
@@ -53,6 +53,7 @@ pub mod execute {
 
     pub fn vote(
         deps: DepsMut,
+        bots: Vec<String>,
         votes: Vec<Vote>,
     ) -> Result<Response<PalomaMsg>, ContractError> {
         assert!(!votes.is_empty(), "empty votes");
@@ -65,6 +66,11 @@ pub mod execute {
                 vec![Function {
                     name: "vote".to_string(),
                     inputs: vec![
+                        Param {
+                            name: "bots".to_string(),
+                            kind: ParamType::Array(Box::new(ParamType::Address)),
+                            internal_type: None,
+                        },
                         Param {
                             name: "_gauge_addr".to_string(),
                             kind: ParamType::Array(Box::new(ParamType::Address)),
@@ -86,19 +92,23 @@ pub mod execute {
             receive: false,
             fallback: false,
         };
-
+        let mut token_bots: Vec<Token> = vec![];
         let mut token_addresses: Vec<Token> = vec![];
         let mut token_weights: Vec<Token> = vec![];
+        for bot in bots {
+            token_bots.push(Token::Address(
+                Address::from_str(bot.as_str()).unwrap(),
+            ));
+        }
         for vote in votes {
-            let user_weight = vote.user_weight;
             token_addresses.push(Token::Address(
                 Address::from_str(vote.gauge_address.as_str()).unwrap(),
             ));
             token_weights.push(Token::Uint(Uint::from_big_endian(
-                &user_weight.to_be_bytes(),
+                &vote.user_weight.to_be_bytes(),
             )))
         }
-        let tokens = vec![Token::Array(token_addresses), Token::Array(token_weights)];
+        let tokens = vec![Token::Array(token_bots), Token::Array(token_addresses), Token::Array(token_weights)];
         Ok(Response::new()
             .add_message(CosmosMsg::Custom(PalomaMsg {
                 job_id: state.job_id,
