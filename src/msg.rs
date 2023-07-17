@@ -8,10 +8,10 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    PutVote {
-        bots: Vec<String>,
-        votes: Vec<Vote>
-    },
+    PutVote { bots: Vec<String>, votes: Vec<Vote> },
+    SetPaloma {},
+    UpdateCompass { new_compass: String },
+    UpdateBlueprint { new_blueprint: String },
 }
 
 #[cw_serde]
