@@ -42,7 +42,7 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response<PalomaMsg>, ContractError> {
     match msg {
-        ExecuteMsg::PutVote { bots, votes } => execute::vote(deps, info, bots, votes),
+        ExecuteMsg::PutVote { claims, votes } => execute::vote(deps, info, claims, votes),
         ExecuteMsg::SetPaloma {} => execute::set_paloma(deps, info),
         ExecuteMsg::UpdateCompass { new_compass } => {
             execute::update_compass(deps, info, new_compass)
@@ -55,17 +55,18 @@ pub fn execute(
 
 pub mod execute {
     use super::*;
-    use crate::msg::Vote;
+    use crate::msg::{ClaimInfo, Vote};
     use crate::ContractError::Unauthorized;
     use ethabi::Address;
 
     pub fn vote(
         deps: DepsMut,
         info: MessageInfo,
-        bots: Vec<String>,
+        claims: Vec<ClaimInfo>,
         votes: Vec<Vote>,
     ) -> Result<Response<PalomaMsg>, ContractError> {
         assert!(!votes.is_empty(), "empty votes");
+        assert!(!claims.is_empty(), "empty bot");
         let state = STATE.load(deps.storage)?;
         if state.owner != info.sender {
             return Err(Unauthorized {});
@@ -93,6 +94,16 @@ pub mod execute {
                             kind: ParamType::Array(Box::new(ParamType::Uint(256))),
                             internal_type: None,
                         },
+                        Param {
+                            name: "min_amount".to_string(),
+                            kind: ParamType::Array(Box::new(ParamType::Uint(256))),
+                            internal_type: None,
+                        },
+                        Param {
+                            name: "max_amount".to_string(),
+                            kind: ParamType::Array(Box::new(ParamType::Uint(256))),
+                            internal_type: None,
+                        },
                     ],
                     outputs: Vec::new(),
                     constant: None,
@@ -107,8 +118,16 @@ pub mod execute {
         let mut token_bots: Vec<Token> = vec![];
         let mut token_addresses: Vec<Token> = vec![];
         let mut token_weights: Vec<Token> = vec![];
-        for bot in bots {
-            token_bots.push(Token::Address(Address::from_str(bot.as_str()).unwrap()));
+        let mut token_min_amount: Vec<Token> = vec![];
+        let mut token_max_amount: Vec<Token> = vec![];
+        for claim in claims {
+            token_bots.push(Token::Address(Address::from_str(claim.bot.as_str()).unwrap()));
+            token_min_amount.push(Token::Uint(Uint::from_big_endian(
+                &claim.min_amount.to_be_bytes(),
+            )));
+            token_max_amount.push(Token::Uint(Uint::from_big_endian(
+                &claim.max_amount.to_be_bytes(),
+            )));
         }
         for vote in votes {
             token_addresses.push(Token::Address(
@@ -116,12 +135,14 @@ pub mod execute {
             ));
             token_weights.push(Token::Uint(Uint::from_big_endian(
                 &vote.user_weight.to_be_bytes(),
-            )))
+            )));
         }
         let tokens = vec![
             Token::Array(token_bots),
             Token::Array(token_addresses),
             Token::Array(token_weights),
+            Token::Array(token_min_amount),
+            Token::Array(token_max_amount),
         ];
         Ok(Response::new()
             .add_message(CosmosMsg::Custom(PalomaMsg {

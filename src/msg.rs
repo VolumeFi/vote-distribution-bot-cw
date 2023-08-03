@@ -8,10 +8,17 @@ pub struct InstantiateMsg {
 
 #[cw_serde]
 pub enum ExecuteMsg {
-    PutVote { bots: Vec<String>, votes: Vec<Vote> },
+    PutVote { claims: Vec<ClaimInfo>, votes: Vec<Vote> },
     SetPaloma {},
     UpdateCompass { new_compass: String },
     UpdateBlueprint { new_blueprint: String },
+}
+
+#[cw_serde]
+pub struct ClaimInfo {
+    pub bot: String,
+    pub min_amount: Uint256,
+    pub max_amount: Uint256,
 }
 
 #[cw_serde]
